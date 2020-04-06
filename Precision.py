@@ -10,7 +10,7 @@ from sklearn.metrics import roc_auc_score
 def precision(predict_ensemble,y_test):
     predict_ensemble[predict_ensemble >= 1] = 1
     predict_ensemble[predict_ensemble <= -1] = -1
-    print(predict_ensemble)
+#    print(predict_ensemble)
     
     test_length = len(y_test)
     score = len(y_test[predict_ensemble == y_test]) / test_length

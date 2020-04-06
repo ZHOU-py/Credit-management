@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Fri Apr  3 16:52:40 2020
+Created on Fri Apr  3 19:53:31 2020
 
 @author: nelson
 """
@@ -10,14 +10,13 @@ import DataDeal
 from random import randrange
 from sklearn.model_selection import train_test_split
 import numpy as np
-import LS_FSVM
+import FSVM
 import GridSearch_parametre
 import Precision
-import pandas as pd
 from imblearn.over_sampling import SVMSMOTE
 
 '''
-    LS-FSVM Bagging
+    FSVM Bagging
     
         data : ndarry, will be seperated into training part and test part
         
@@ -52,9 +51,6 @@ from imblearn.over_sampling import SVMSMOTE
 
 '''
 
-
-
-
 def subsample(dataset, ratio=1.0):
     sample = list()
     n_sample = round(len(dataset) * ratio)
@@ -64,7 +60,7 @@ def subsample(dataset, ratio=1.0):
     return sample
         
         
-def LS_FSVM_bagging(data,databalance,kernel_dict_type,param_grid, judgment='Acc',\
+def FSVM_bagging(data, databalance, kernel_dict_type,  param_grid, judgment='Acc',\
                  fuzzyvalue = {'type':'Cen','function':'Lin'} , r_max=1, r_min=1):
     
     train_data,test = train_test_split(data, test_size=0.2)
@@ -74,13 +70,13 @@ def LS_FSVM_bagging(data,databalance,kernel_dict_type,param_grid, judgment='Acc'
     y_train = train_data[:,-1]
 
     predict_ensemble = []
+    
     for i in range(test_length):
-        predict_ensemble.append(0)    
+        predict_ensemble.append(0)
 
     for i in range(7):
-        #sample = np.array(subsample(dataset=data[:-test_length, :], ratio=0.7))
         sample = np.array(subsample(dataset=train_data, ratio=0.8))
-        train_data = sample        
+        train_data = sample
         x_train = train_data[:,:-1]
         y_train = train_data[:,-1]
         
@@ -102,8 +98,6 @@ def LS_FSVM_bagging(data,databalance,kernel_dict_type,param_grid, judgment='Acc'
             x_train = train_data[:,:-1]
             y_train = train_data[:,-1]
         
-
-        
         if kernel_dict_type=='LINEAR':
             C = GridSearch_parametre.LS_FSVM_best(train_data,test,kernel_dict_type,\
                                                   param_grid,judgment,fuzzyvalue, r_max, r_min)
@@ -119,7 +113,7 @@ def LS_FSVM_bagging(data,databalance,kernel_dict_type,param_grid, judgment='Acc'
                                                   param_grid,judgment,fuzzyvalue, r_max, r_min)
             kernel_dict={'type': 'POLY','d': d}
             
-        clf = LS_FSVM.LSFSVM(C,kernel_dict,fuzzyvalue,r_max, r_min)
+        clf = FSVM.FSVM(C,kernel_dict,fuzzyvalue,r_max, r_min)
         clf._mvalue(x_train, y_train)
         clf.fit(x_train, y_train)
         y_predict = clf.predict(x_test)
@@ -135,12 +129,8 @@ def LS_FSVM_bagging(data,databalance,kernel_dict_type,param_grid, judgment='Acc'
         
 if __name__ == '__main__':
     data = DataDeal.get_data() 
-    fuzzyvalue = {'type':'Hyp','function':'Exp'} 
-#    param_grid = {'C': np.logspace(0, 2, 40), 'sigma': np.logspace(-1,10,25)}
-    param_grid = {'C': np.logspace(0, 1, 50), 'd': range(10)}
+    fuzzyvalue = {'type':'Cen','function':'Lin'} 
+    param_grid = {'C': np.logspace(0, 2, 40), 'sigma': np.logspace(-1, 0, 30)}
+#    param_grid = {'C': np.logspace(0, 1, 50), 'd': range(10)}
     databalance = 'UpSampling'
-    LS_FSVM_bagging(data,databalance,'POLY',param_grid,'Acc', fuzzyvalue, 3/4,1)  
-
-
-
-      
+    FSVM_bagging(data,databalance,'RBF',param_grid,'Acc',fuzzyvalue, 3/4)  
