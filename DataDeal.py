@@ -2,22 +2,30 @@ import pandas as pd
 import numpy as np
 import random
 from sklearn import preprocessing
+from sklearn.model_selection import train_test_split
 from sklearn.decomposition import PCA
-'''
-def get_data():
-    df = pd.read_csv('german.csv',header=None, quoting=3)
 
+def get_data():
+    df = pd.read_csv('german.csv')
     data = np.array(df)
 
-    #data[:,:-1] = preprocessing.scale(data[:,:-1])
-    #print(data.shape)
-    data[:, -1][data[:, -1] == 2] = -1
+    data[:, 0][data[:, 0] == 0] = -1
+    X = data[:,1:]
+    min_max_scaler = preprocessing.MinMaxScaler()
+    X = min_max_scaler.fit_transform(X)
+    data = np.concatenate((X,data[:,0].reshape(len(data[:,0]),1)),axis=1)
+    
+    Train_data,test = train_test_split(data, test_size=0.2)
+        
+    x_test = test[:,:-1]
+    y_test = test[:,-1]
+    x_train = Train_data[:,:-1]
+    y_train = Train_data[:,-1]
+        
+    return x_train,y_train,x_test,y_test
 
-
-    return data
 
 '''
-"""
 def get_data():
     df = pd.read_csv('australian.csv',header=None)
 
@@ -26,8 +34,8 @@ def get_data():
     data[:,-1][data[:,-1]==0] = -1
 
     return data
-"""
-
+'''
+'''
 def get_data():
     df = pd.read_csv('german_numerical.csv',header=None, quoting=3)
     df = df.drop([0],axis=0)
@@ -57,8 +65,15 @@ def get_data():
     X_pca = min_max_scaler.fit_transform(X_pca)
     data = np.append(X_pca,data[:, -1:],axis=1)
     
-    return data
-
+    Train_data,test = train_test_split(data, test_size=0.2)
+    
+    x_test = test[:,:-1]
+    y_test = test[:,-1]
+    x_train = Train_data[:,:-1]
+    y_train = Train_data[:,-1]
+    
+    return x_train,y_train,x_test,y_test
+'''
 #data = get_data()
 #print(len(data[data[:,-1] == -1]))
 #print(get_data())

@@ -41,15 +41,16 @@ Function LS_FSVM_best
 
 """
 
-def LS_FSVM_best(train_data,test,kernel_dict_type, param_grid, judgment='Acc',\
+def LS_FSVM_best(X,y,kernel_dict_type, param_grid, judgment='Acc',\
                  fuzzyvalue = {'type':'Cen','function':'Lin'} , r_max=1, r_min=1):   
     
-    test_length = test.shape[0]
-    x_test = test[:,:-1]
-    y_test = test[:,-1]
-    x_train = train_data[:,:-1]
-    y_train = train_data[:,-1]
-            
+    index = int(0.2*len(y))
+    x_test = X[:index,:]
+    y_test = y[:index]
+    x_train = X[index:,:]
+    y_train = y[index:]
+    test_length = y_test.shape[0]
+           
     score = 0
     best_score = 0
     score_memory = []
@@ -117,17 +118,13 @@ def LS_FSVM_best(train_data,test,kernel_dict_type, param_grid, judgment='Acc',\
 
     
 if __name__ == '__main__':
-    data = DataDeal.get_data()[:800,:]
-    train_data,test = train_test_split(data, test_size=0.2)
-    x_test = test[:,:-1]
-    y_test = test[:,-1]
-    x_train = train_data[:,:-1]
-    y_train = train_data[:,-1]
+    x_train,y_train,x_test,y_test = DataDeal.get_data()
+
     
     fuzzyvalue = {'type':'Cen','function':'Lin'} 
     param_grid = {'C': np.logspace(0, 1, 50), 'sigma': np.logspace(-2, 0.5, 50)}
     
-    C = LS_FSVM_best(train_data,test,'LINEAR',param_grid,'AUC',fuzzyvalue, 3/4, 1)
+    C = LS_FSVM_best(x_train,y_train,'LINEAR',param_grid,'AUC',fuzzyvalue, 3/4, 1)
     kernel_dict = {'type': 'LINEAR'} 
     
     clf = LS_FSVM.LSFSVM(C,kernel_dict,fuzzyvalue,3/4)

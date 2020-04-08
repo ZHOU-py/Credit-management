@@ -13,6 +13,7 @@ from numpy import linalg as LA
 import Kernel
 from sklearn.model_selection import train_test_split
 import Precision
+from sklearn import preprocessing
 
 """
 
@@ -40,23 +41,24 @@ import Precision
 
 """
 
-
+ 
 class LSFSVM():
     
     def __init__(self, C=3, kernel_dict={'type': 'LINEAR'}, \
                  fuzzyvalue={'type':'Cen','function':'Lin'}, r_max = 1, r_min = 1):
+
         self.C = C
         self.kernel_dict = kernel_dict
         self.fuzzyvalue = fuzzyvalue
         self.r_max = r_max
         self.r_min = r_min
         
-        self.m_value = None
+#        self.m_value = None
+#        self.alpha = None
+#        self.b = None
+#        self.K = None
         
-
-        self.alpha = None
-        self.b = None
-        self.K = None
+        
 
     def _mvalue(self, X, y):
 #        print('fuzzy value:', self.fuzzyvalue )
@@ -177,6 +179,8 @@ class LSFSVM():
         self.alpha = alpha
         self.b = b
         self.K = K
+        
+        return self
       
         
     def predict(self, X):
@@ -184,10 +188,31 @@ class LSFSVM():
         self.K.expand(X)
         A = np.multiply(self.alpha, self.Y)
         y_pred = self.b + np.dot(self.K.testMat, A)
+             
         y_pred[y_pred >= 0] = 1
         y_pred[y_pred < 0] = -1
 
         return y_pred
+    
+    def predict_prob(self, X):
+        self.K.expand(X)
+        A = np.multiply(self.alpha, self.Y)
+        y_pred = self.b + np.dot(self.K.testMat, A)
+
+        scale_min = max(y_pred[y_pred<0]) - min(y_pred[y_pred<0])
+        scale_max = max(y_pred[y_pred>=0]) -min(y_pred[y_pred>=0])
+        
+        y_prob = np.zeros(len(y_pred))
+        for i in range(len(y_pred)):
+            if y_pred[i]<=0:
+                y_prob[i] = 0.5*(y_pred[i]-min(y_pred[y_pred<=0]))/scale_min
+                y_prob[i] = round(y_prob[i],3)
+            else:
+                y_prob[i] = 0.5*(y_pred[i]- min(y_pred[y_pred>0]))/scale_max +0.5 
+                y_prob[i] = round(y_prob[i],3)
+                
+        return y_prob
+        
 
 
 
@@ -195,14 +220,8 @@ class LSFSVM():
 
 if __name__ == '__main__':
     
-    data = DataDeal.get_data()[:800,:]
-    Train_data,test = train_test_split(data, test_size=0.2)
-    
-    
-    x_test = test[:,:-1]
-    y_test = test[:,-1]
-    x_train = Train_data[:,:-1]
-    y_train = Train_data[:,-1]
+    x_train,y_train,x_test,y_test = DataDeal.get_data()
+
     
     kernel_dict = {'type': 'RBF','sigma':0.717}
     fuzzyvalue = {'type':'Cen','function':'Lin'}
@@ -210,7 +229,9 @@ if __name__ == '__main__':
     clf = LSFSVM(10,kernel_dict, fuzzyvalue,3/4)
     m = clf._mvalue(x_train, y_train)
     clf.fit(x_train, y_train)
-    Y_predict = clf.predict(x_test)
-
-    Precision.precision(Y_predict,y_test)
+    y_pred = clf.predict(x_test)
+    y_prob = clf.predict_prob(x_test)
+    print('y_prob',y_prob)
+    
+    Precision.precision(y_pred,y_test)
 
