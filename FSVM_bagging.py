@@ -8,16 +8,18 @@ Created on Fri Apr  3 19:53:31 2020
 
 import DataDeal
 from random import randrange
-from sklearn.model_selection import train_test_split
 import numpy as np
 import FSVM
 import GridSearch_parametre
 import Precision
 from imblearn.over_sampling import SVMSMOTE
 import pickle
+from sklearn.model_selection import train_test_split
 
 '''
     FSVM Bagging
+    
+    Parameter
     
         data : ndarry, will be seperated into training part and test part
         
@@ -49,7 +51,19 @@ import pickle
               
               usually for the majority class r = len(y_minority)/len(y_majority) 
                   and for the minority class r = 1
-
+                  
+    Methods
+         
+        fit(self, X, Y)
+            Fit the model according to the given training data.
+        
+        predict(self, X)
+            Predict class labels for samples in X.
+            
+        
+        predict_prob(self,X)
+            Posterior class probability Pr(y = 1|x)
+        
 '''
 
 class FSVM_bagging(object):
@@ -81,33 +95,29 @@ class FSVM_bagging(object):
         train_data = np.append(X,y.reshape(len(y),1),axis=1)   
         
         clf = [[]]*self.n_estimator
+        
+        if  self.databalance =='LowSampling':
+            data_maj = train_data[y == 1]  # 将多数
+            data_min =  train_data[y != 1] 
+            index = np.random.randint(len(data_maj), size=len(data_min)) 
+            lower_data_maj = data_maj[list(index)]
+            train_data = np.append(lower_data_maj,data_min,axis=0)
+        
+        elif  self.databalance =='UpSampling':
+            x_train, y_train = SVMSMOTE(random_state=42).fit_sample(train_data[:, :-1],\
+                                       np.asarray(train_data[:, -1]))
+            train_data = np.append(x_train,y_train.reshape(len(y_train),1),axis=1)
+            
+        else:
+            train_data = train_data
     
+        
         for i in range(self.n_estimator):
             #sample = np.array(subsample(dataset=data[:-test_length, :], ratio=0.7))
             sample = np.array(self.subsample(dataset=train_data, ratio=0.8))
             train_data = sample        
             x_train = train_data[:,:-1]
             y_train = train_data[:,-1]
-            
-            if self.databalance =='LowSampling':
-                data_maj = train_data[y_train == 1]  # 将多数
-                data_min =  train_data[y_train != 1] 
-                index = np.random.randint(len(data_maj), size=len(data_min)) 
-                lower_data_maj = data_maj[list(index)]
-                train_data = np.append(lower_data_maj,data_min,axis=0)
-                x_train = train_data[:,:-1]
-                y_train = train_data[:, -1]
-        
-            elif self.databalance =='UpSampling':
-                x_train, y_train = SVMSMOTE(random_state=42).fit_sample(train_data[:, :-1],\
-                                           np.asarray(train_data[:, -1]))
-                train_data = np.append(x_train,y_train.reshape(len(y_train),1),axis=1)
-                
-            else:
-                x_train = train_data[:,:-1]
-                y_train = train_data[:,-1]
-            
-    
             
             if self.kernel_dict_type=='LINEAR':
                 C = GridSearch_parametre.LS_FSVM_best(x_train,y_train,self.kernel_dict_type,\
@@ -125,12 +135,12 @@ class FSVM_bagging(object):
                 kernel_dict={'type': 'POLY','d': d}
             
             
-            clf[i] = FSVM.FSVM(C,kernel_dict,self.fuzzyvalue,self.r_max, self.r_min)
+            clf[i] = FSVM.FSVM(C,kernel_dict,self.fuzzyvalue,'origine',self.r_max, self.r_min)
             clf[i]._mvalue(x_train, y_train)
             clf[i].fit(x_train, y_train)
             
             
-        with open('save/Fsvm_bagging.pkl', 'wb') as f:
+        with open('Fsvm_bagging.pkl', 'wb') as f:
             for i in range(self.n_estimator):
                 pickle.dump(clf[i], f, pickle.HIGHEST_PROTOCOL) 
                 
@@ -144,7 +154,7 @@ class FSVM_bagging(object):
         clf = [[]]*self.n_estimator
     
 
-        with open('save/Fsvm_bagging.pkl', 'rb') as f:
+        with open('Fsvm_bagging.pkl', 'rb') as f:
             for i in range(self.n_estimator):
                 clf[i] = pickle.load(f)
 
@@ -152,7 +162,6 @@ class FSVM_bagging(object):
             y_predict = clf[i].predict(X)
             predict_ensemble = predict_ensemble + y_predict           
        
-        print(predict_ensemble)
         predict_ensemble[predict_ensemble >= 1] = 1
         predict_ensemble[predict_ensemble <= -1] = -1
         
@@ -167,11 +176,12 @@ class FSVM_bagging(object):
         clf = [[]]*self.n_estimator
     
 
-        with open('save/Fsvm_bagging.pkl', 'rb') as f:
+        with open('Fsvm_bagging.pkl', 'rb') as f:
             for i in range(self.n_estimator):
                 clf[i] = pickle.load(f)
 
         for i in range(self.n_estimator):
+            clf[i].predict(X)
             y_prob = clf[i].predict_prob(X)
             proba = proba + y_prob
             
@@ -181,15 +191,26 @@ class FSVM_bagging(object):
         
         
 if __name__ == '__main__':
-    x_train,y_train,x_test,y_test = DataDeal.get_data() 
+    data = DataDeal.get_data('german_numerical.csv')
+    Train_data,test = train_test_split(data, test_size=0.2)
+    
+    x_test = test[:,:-1]
+    y_test = test[:,-1]
+    x_train = Train_data[:,:-1]
+    y_train = Train_data[:,-1]
+    
     fuzzyvalue = {'type':'Hyp','function':'Exp'} 
 #    param_grid = {'C': np.logspace(0, 2, 40), 'sigma': np.logspace(-1,10,25)}
     param_grid = {'C': np.logspace(0, 1, 50), 'd': range(10)}
-    databalance = 'LowSampling'
+    databalance = 'UpSampling'
     fb = FSVM_bagging(5,databalance,'LINEAR',param_grid,'Acc', fuzzyvalue, 3/4,1) 
     fb.fit(x_train,y_train)
     predict_ensemble = fb.predict(x_test)
     prob = fb.predict_prob(x_test)
     
     print(prob)
+    print(predict_ensemble[prob<0.5])
+    i = predict_ensemble[prob>0.5]
+    y_p = prob[prob>0.5]
+    print(y_p[i==-1])
     Precision.precision(predict_ensemble,y_test)
