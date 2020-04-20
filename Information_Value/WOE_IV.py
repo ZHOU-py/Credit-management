@@ -90,41 +90,41 @@ def IV_plot(model):
         y_df = pd.DataFrame({"Yp":y})
         Y = y_df['Yp']
     
-    badnum=len(Y[Y==0])    # 坏用户数量
-    goodnum=Y.count()-badnum    #好用户数量
+    badnum=len(Y[Y==0])    # amount of bad clients
+    goodnum=Y.count()-badnum    # amount of good clients
     
     
     
     def self_bin_object(X):
-        d1 = pd.DataFrame({"X": X, "Y": Y,"Bucket": X})#建立个数据框 X-- 各个特征变量 ， Y--用户好坏标签 ， Bucket--各个分箱    
-        d2 = d1.groupby('Bucket', as_index = True)# 按照分箱结果进行分组聚合
+        d1 = pd.DataFrame({"X": X, "Y": Y,"Bucket": X})#create a DateFrame X-- attribut ， Y--label ， Bucket--each binning    
+        d2 = d1.groupby('Bucket', as_index = True)# Group and aggregate according to binning results
         d3 = pd.DataFrame(d2.count(), columns = ['good'])      
         d3['good'] = d2.sum().Y    
         d3['total'] = d2.count().Y   
         d3['bad'] =  d3['total'] - d3['good']
         d3['rate'] = d2.mean().Y
-        d3['woe']=np.log((d3['bad']/badnum)/(d3['good']/goodnum))# 计算每个箱体的woe值
-        d3['badattr'] = d3['bad']/badnum  #每个箱体中坏样本所占坏样本总数的比例
-        d3['goodattr'] = d3['good']/goodnum  # 每个箱体中好样本所占好样本总数的比例
-        iv = ((d3['badattr']-d3['goodattr'])*d3['woe']).sum()  # 计算变量的iv值  # 计算变量的iv值
-        d4 = (d3.sort_index(by ='good')).reset_index(drop=True)   # 对箱体从大到小进行排序
+        d3['woe']=np.log((d3['bad']/badnum)/(d3['good']/goodnum))# calcuate WOE of each binning
+        d3['badattr'] = d3['bad']/badnum  # distribution of bad clients in each binning
+        d3['goodattr'] = d3['good']/goodnum  # distribution of good clients in each binning
+        iv = ((d3['badattr']-d3['goodattr'])*d3['woe']).sum()  # calculate Information VAlue
+        d4 = (d3.sort_index(by ='good')).reset_index(drop=True)   # ranking 
         woe=list(d4['woe'].round(3))
         return iv,d3,woe
     
     
     def self_bin_numeric(X,cut):
-        d1 = pd.DataFrame({"X": X, "Y": Y,"Bucket": pd.cut(X, cut)})#建立个数据框 X-- 各个特征变量 ， Y--用户好坏标签 ， Bucket--各个分箱    
-        d2 = d1.groupby('Bucket', as_index = True)# 按照分箱结果进行分组聚合
+        d1 = pd.DataFrame({"X": X, "Y": Y,"Bucket": pd.cut(X, cut)})    
+        d2 = d1.groupby('Bucket', as_index = True)
         d3 = pd.DataFrame(d2.count(), columns = ['good'])      
         d3['good'] = d2.sum().Y    
         d3['total'] = d2.count().Y   
         d3['bad'] =  d3['total']- d3['good']
         d3['rate'] = d2.mean().Y
-        d3['woe']=np.log((d3['bad']/badnum)/(d3['good']/goodnum))# 计算每个箱体的woe值
-        d3['badattr'] = d3['bad']/badnum  #每个箱体中坏样本所占坏样本总数的比例
-        d3['goodattr'] = d3['good']/goodnum  # 每个箱体中好样本所占好样本总数的比例
-        iv = ((d3['badattr']-d3['goodattr'])*d3['woe']).sum()  # 计算变量的iv值  # 计算变量的iv值
-        d4 = (d3.sort_index(by ='good')).reset_index(drop=True)   # 对箱体从大到小进行排序
+        d3['woe']=np.log((d3['bad']/badnum)/(d3['good']/goodnum))
+        d3['badattr'] = d3['bad']/badnum  
+        d3['goodattr'] = d3['good']/goodnum  
+        iv = ((d3['badattr']-d3['goodattr'])*d3['woe']).sum()  
+        d4 = (d3.sort_index(by ='good')).reset_index(drop=True)  
         woe=list(d4['woe'].round(3))
         return iv,d3,woe
         
