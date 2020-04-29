@@ -13,9 +13,11 @@ from sklearn.model_selection import train_test_split
 import Precision
 
 
-def predict(fichier,Xtrain, Xtest):
+def predict(fichier,fichier_Xtrain, Xtest):
     
     df = pd.read_csv(fichier)
+    Xtrain = pd.read_csv(fichier_Xtrain)
+    Xtrain = np.array(Xtrain)
     A = np.multiply(df.alpha, df.Y)
     
     if df.Kernel[0]=='RBF':
@@ -39,8 +41,10 @@ def predict(fichier,Xtrain, Xtest):
     return y_pred
 
 
-def predict_prob(fichier,Xtrain, Xtest):
+def predict_prob(fichier,fichier_Xtrain, Xtest):
     df = pd.read_csv(fichier)
+    Xtrain = pd.read_csv(fichier_Xtrain)
+    Xtrain = np.array(Xtrain)
     A = np.multiply(df.alpha, df.Y)
     
     if df.Kernel[0]=='RBF':
@@ -89,12 +93,12 @@ if __name__ == '__main__':
     x_train = Train_data[:,:-1]
     y_train = Train_data[:,-1]
 
-    y_pred = predict('Parameter/FSVM_Cen_Lin_RBF_Origine.csv', x_train,x_test)
-    y_prob = predict_prob('Parameter/FSVM_Cen_Lin_RBF_Origine.csv', x_train,x_test)
-#    y_pred = predict('Parameter/FSVM_Cen_Lin_RBF_Origine.csv', x_train,x_test)
-#    y_prob = predict_prob('Parameter/FSVM_Cen_Lin_RBF_Origine.csv', x_train,x_test)
+    y_pred = predict('Parameter/LSFSVM_Cen_Lin_RBF_Origine.csv', 'Parameter/X_train.csv',x_test)
+    y_prob = predict_prob('Parameter/LSFSVM_Cen_Lin_RBF_Origine.csv', 'Parameter/X_train.csv',x_test)
+#    y_pred = predict('Parameter/FSVM_Cen_Lin_RBF_Origine.csv', 'Parameter/X_train.csv',x_test)
+#    y_prob = predict_prob('Parameter/FSVM_Cen_Lin_RBF_Origine.csv', 'Parameter/X_train.csv',x_test)
     
-    print(y_pred)
-    print(y_prob)
+ #   print(y_pred)
+ #   print(y_prob)
     
     Precision.precision(y_pred,y_test)
