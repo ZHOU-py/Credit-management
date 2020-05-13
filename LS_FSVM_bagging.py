@@ -97,14 +97,14 @@ class LS_FSVM_bagging(object):
         
         clf = [[]]*self.n_estimator
         
-        if databalance =='LowSampling':
+        if self.databalance =='LowSampling':
             data_maj = train_data[y == 1]  # 将多数
             data_min =  train_data[y != 1] 
             index = np.random.randint(len(data_maj), size=len(data_min)) 
             lower_data_maj = data_maj[list(index)]
             train_data = np.append(lower_data_maj,data_min,axis=0)
         
-        elif databalance =='UpSampling':
+        elif self.databalance =='UpSampling':
             x_train, y_train = SVMSMOTE(random_state=42).fit_sample(train_data[:, :-1],\
                                        np.asarray(train_data[:, -1]))
             train_data = np.append(x_train,y_train.reshape(len(y_train),1),axis=1)
@@ -191,18 +191,24 @@ class LS_FSVM_bagging(object):
         
         
 if __name__ == '__main__':
-    data = DataDeal.get_data('german_numerical.csv')
-    Train_data,test = train_test_split(data, test_size=0.2)
+    data = pd.read_csv('DF4.csv')
+    X = data.drop(['default'],axis = 1)
+    label = data['default']
+    data = DataDeal.get_data(X,label,'normaliser',scaler='True')
+    x = data[:,:-1]
+    y = data[:,-1]
     
+    Train_data,test = train_test_split(data, test_size=0.2,random_state = 42)
+   
     x_test = test[:,:-1]
     y_test = test[:,-1]
     x_train = Train_data[:,:-1]
     y_train = Train_data[:,-1]
     
-    fuzzyvalue = {'type':'Hyp','function':'Exp'} 
-#    param_grid = {'C': np.logspace(0, 2, 40), 'sigma': np.logspace(-1,10,25)}
-    param_grid = {'C': np.logspace(0, 1, 50), 'd': range(10)}
-    databalance = 'UpSampling'
+    fuzzyvalue = {'type':'Cen','function':'Lin'} 
+    param_grid = {'C': np.logspace(0, 2, 40), 'sigma': np.logspace(-1,1,25)}
+#    param_grid = {'C': np.logspace(0, 1, 50), 'd': range(10)}
+    databalance = 'o'
     lsb = LS_FSVM_bagging(5,databalance,'LINEAR',param_grid,'Acc', fuzzyvalue, 3/4,1) 
     lsb.fit(x_train,y_train)
     predict_ensemble = lsb.predict(x_test)

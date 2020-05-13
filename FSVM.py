@@ -7,7 +7,7 @@ Created on Fri Apr  3 11:45:41 2020
 """
 
 import DataDeal
-
+import pandas as pd
 import numpy as np
 from numpy import linalg as LA
 import Kernel
@@ -17,6 +17,7 @@ import Precision
 from imblearn.over_sampling import SVMSMOTE
 import math
 from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedShuffleSplit
 
 
 """
@@ -414,13 +415,25 @@ class FSVM():
 
 if __name__ == '__main__':
     
-    data = DataDeal.get_data('german_numerical.csv')
-    Train_data,test = train_test_split(data, test_size=0.2)
+    data = pd.read_csv('DF4.csv')
+    X = data.drop(['default'],axis = 1)
+    label = data['default']
+    data = DataDeal.get_data(X,label,'normaliser',scaler='True')
+    x = data[:,:-1]
+    y = data[:,-1]
+    
+    Train_data,test = train_test_split(data, test_size=0.2,random_state = 42)
     
     x_test = test[:,:-1]
     y_test = test[:,-1]
     x_train = Train_data[:,:-1]
     y_train = Train_data[:,-1]
+    
+#    ss=StratifiedShuffleSplit(n_splits=3,test_size=0.2,train_size=0.8, random_state=0)
+
+#    for train_index, test_index in ss.split(x, y):
+#       x_train, x_test = x[train_index,:], x[test_index,:]#训练集对应的值
+#       y_train, y_test = y[train_index], y[test_index]#类别集对应的值
 
     
     kernel_dict = {'type': 'RBF','sigma':0.717}
@@ -433,12 +446,13 @@ if __name__ == '__main__':
     y_prob = clf.predict_prob(x_test)
     decision_function = clf.decision_function(x_test)
 
-    print('y_prob',y_prob)   
-    print(y_pred[y_prob<0.5])
-    i = y_pred[y_prob>0.5]
-    y_p = y_prob[y_prob>0.5]
-    print(y_p[i==-1])
-    
+#    print('y_prob',y_prob)   
+#    print(y_pred[y_prob<0.5])
+#    print(y_pred[y_prob>0.5])
 #    print(decision_function)
+    
+    print('y_prob',y_prob[:10]) 
+    print('y_pred',y_pred[:10]) 
+    print('y_test',y_test[:10]) 
     
     Precision.precision(y_pred,y_test)

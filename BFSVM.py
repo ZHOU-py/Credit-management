@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Wed Apr  1 22:46:20 2020
+Created on Sat May  2 15:21:54 2020
 
-@author: zinan
+@author: Zinan
 """
 
 import DataDeal
@@ -11,16 +11,19 @@ import pandas as pd
 import numpy as np
 from numpy import linalg as LA
 import Kernel
+import cvxopt
+from cvxopt import matrix
 import Precision
 from imblearn.over_sampling import SVMSMOTE
 import math
 from sklearn.model_selection import train_test_split
+from scipy.stats import norm
 from sklearn.model_selection import StratifiedShuffleSplit
 
-"""
 
-  Least Square Fuzzy SVM
-  linear equation problem  Package: NUMPY.LINALG
+"""
+  Bilateral-Weighted Fuzzy SVM
+  Convex function optimization problem  Package: CVXOPT
 
 Parameters
 
@@ -29,19 +32,11 @@ Parameters
       'type': 'LINEAR' / 'RBF' 'sigma' / 'POLY' 'd'
       
   fuzzyvalue:
-      membershape value based on the class of center
-      'type': 'Cen' 
-      'function' : 'Lin' / 'Exp'
       
       membershape value based on the actuale hyper-plane
       'type': 'Hyp' 
-      'function' : 'Lin' / 'Exp'
+      'function' : 'Linear' / 'Bridge' / 'Logistic' / 'Probit'
       
-      r_max : radio between 0 and 1
-      r_min : radio between 0 and 1    for balancing data
-      
-      usually for the majority class r = len(y_minority)/len(y_majority) 
-          and for the minority class r = 1
 
 
 Methods
@@ -66,28 +61,28 @@ Methods
     decision_function(self, X)
         Predict confidence scores for samples.
         The confidence score for a sample is the signed distance of that sample to the hyperplane.
+       
 
 """
 
- 
-class LSFSVM():
+
+class BFSVM():
     
     def __init__(self, C=3, kernel_dict={'type': 'LINEAR'}, \
-                 fuzzyvalue={'type':'Cen','function':'Lin'}, databalance='origine',r_max = 1, r_min = 1):
-
+                 fuzzyvalue={'type':'Hyp','function':'Linear'},databalance='origine'):
+        
         self.C = C
         self.kernel_dict = kernel_dict
         self.fuzzyvalue = fuzzyvalue
-        self.r_max = r_max
-        self.r_min = r_min
         self.databalance = databalance
+
         
-#        self.m_value = None
-#        self.alpha = None
-#        self.b = None
-#        self.K = None
-        
-        
+        self.m_value = None
+        self.gamme = None
+        self.beta = None
+        self.b = None
+        self.K = None
+        self.y_predict = None
 
     def _mvalue(self, X, y):
 #        print('fuzzy value:', self.fuzzyvalue )
@@ -110,39 +105,8 @@ class LSFSVM():
             X = X
             y = y
         
-        if self.fuzzyvalue['type'] == 'Cen':
-            
-            x_1 = X[y==1]
-            x_0 = X[y==-1]
-            x_centre_1 = np.mean(x_1, axis=0)
-            x_centre_0 = np.mean(x_0, axis=0)
-            max_distance_1 = 0
-            max_distance_0 = 0
-            for i in range(len(x_1)):
-                distance = LA.norm(x_centre_1 - x_1[i,:])
-                if max_distance_1 < distance:
-                    max_distance_1 = distance
-            for i in range(len(x_0)):
-                distance = LA.norm(x_centre_0 - x_0[i,:])
-                if max_distance_0 < distance:
-                    max_distance_0 = distance
-        
-            memership = []
-            if self.fuzzyvalue['function'] == 'Lin':
-                for i in range(len(y)):
-                    if y[i]  == 1:
-                        memership.append((1 - LA.norm(X[i]-x_centre_1)/(max_distance_1+0.0001))* self.r_max)
-                    if y[i]  == -1:
-                        memership.append((1 - LA.norm(X[i]-x_centre_0)/(max_distance_0+0.0001))*self.r_min)
                         
-            elif self.fuzzyvalue['function'] == 'Exp':
-                for i in range(len(y)):
-                    if y[i] == 1:
-                        memership.append((2/(1+np.exp(LA.norm(X[i]-x_centre_1))))* self.r_max)
-                    if y[i] == -1:
-                        memership.append((2/(1+np.exp(LA.norm(X[i]-x_centre_0))))*self.r_min)
-                        
-        elif self.fuzzyvalue['type'] == 'Hyp':
+        if self.fuzzyvalue['type'] == 'Hyp':
             m = y.shape[0]
             C = 3
             gamma = 1
@@ -152,50 +116,65 @@ class LSFSVM():
             K.calculate(X)
         
         
-            H = np.multiply(np.dot(np.matrix(y).T, np.matrix(y)), K.kernelMat)
-            M_BR = H + np.eye(m) / C
-            # Concatenate
-            L_L = np.concatenate((np.matrix(0), np.matrix(y).T), axis=0)
-            L_R = np.concatenate((np.matrix(y), M_BR), axis=0)
-            L = np.concatenate((L_L, L_R), axis=1)
-            R = np.ones(m + 1)
-            R[0] = 0
-            # solve
-            b_a = LA.solve(L, R)
-            b = b_a[0]
-            alpha = b_a[1:]
+            P = cvxopt.matrix(np.outer(y, y) * K.kernelMat)
+            q = cvxopt.matrix(np.ones(m) * -1)
+            A = cvxopt.matrix(y, (1, m))
+            A = matrix(A, (1, m), 'd')
+            b = cvxopt.matrix(0.0)
             
+            tmp1 = np.diag(np.ones(m) * -1)
+            tmp2 = np.identity(m)
+            G = cvxopt.matrix(np.vstack((tmp1, tmp2)))
+            
+            tmp1 = np.zeros(m)
+            tmp2 = np.ones(m) * C
+            h = cvxopt.matrix(np.hstack((tmp1, tmp2)))
+            
+            solution = cvxopt.solvers.qp(P, q, G, h, A, b)
+        
+            alpha = np.ravel(solution['x'])
+            b = 0
+            sum_y = sum(y)
+            A = np.multiply(alpha, y)
+            b = (sum_y - np.sum(K.kernelMat * A.reshape(len(A),1)))/len(alpha)   
             K.expand(X)
             A = np.multiply(alpha, y)
         
-            f = b + np.dot(K.testMat, A)
-            
-            d_hyp = abs(f*y)
-        
+            f = b + np.sum(K.testMat * A.reshape(len(A),1),axis=0)
+#            print(f)
             memership = []
-            if self.fuzzyvalue['function'] == 'Lin':
-                for i in range(len(y)):
-                    if y[i]  == 1:
-                        memership.append((1 - d_hyp[i]/(max(d_hyp)+0.0001))*self.r_max)
-                    if y[i]  == -1:
-                        memership.append((1 - d_hyp[i]/(max(d_hyp)+0.0001))*self.r_min)
+            if self.fuzzyvalue['function'] == 'Linear':
+                memership = (f - min(f))/ (max(f) - min(f))
                         
-            elif self.fuzzyvalue['function'] == 'Exp':
-                for i in range(len(y)):
-                    if y[i] == 1:
-                        memership.append((2/(1+ np.exp(d_hyp[i])))* self.r_max)
-                    if y[i] == -1:
-                        memership.append((2/(1+ np.exp(d_hyp[i])))*self.r_min)
-                
+            elif self.fuzzyvalue['function'] == 'Bridge':
+                s_up = np.percentile(f,75)
+                s_down = np.percentile(f,25)
+                memership = np.zeros((len(f)))
+                for i in range(len(f)):
+                    if f[i]>s_up:
+                        memership[i] = 1
+                    elif f[i]<=s_down:
+                        memership[i] = 0
+                    else:
+                        memership[i] = (f[i]-s_down)/(s_up-s_down)
+                        
+            elif self.fuzzyvalue['function'] == 'Logistic':
+                a = 1
+                N_pos = len(y[y==1])
+                #the average of the N+ th highest primary score and the (N+ +1)th highest primary score.
+                b = (f[N_pos]+f[N_pos+1])/2   
+                memership = np.exp(a*f+b)/(np.exp(a*f+b)+1)
             
+            elif self.fuzzyvalue['function'] == 'Probit':
+                memership = norm.cdf(f)
+                
                         
         self.m_value = np.array(memership)
         return self.m_value
 
-    
-        
+
     def fit(self, X, Y):
-#        print('Kernel:', self.kernel_dict)
+#        print('Kernel:', kernel_dict)
         train_data = np.append(X,Y.reshape(len(Y),1),axis=1)
         
         if self.databalance =='LowSampling':
@@ -217,33 +196,52 @@ class LSFSVM():
             X = X
             Y = Y
             self.Y =  Y
-            
-        m = len(Y)
+        
+        m = Y.shape[0]
       
         # Kernel
         if self.kernel_dict['type'] == 'RBF':
             K = Kernel.RBF(m, self.kernel_dict['sigma'])
-            K.calculate(X)
         elif self.kernel_dict['type'] == 'LINEAR':
             K = Kernel.LINEAR(m)
-            K.calculate(X)
         elif self.kernel_dict['type'] == 'POLY':
             K = Kernel.POLY(m, self.kernel_dict['d'])
-            K.calculate(X)
+            
+        K.calculate(X)
+            
+        kernel = np.zeros((2*m, 2*m))
+        kernel[:m,:m] = K.kernelMat 
+        P = cvxopt.matrix(kernel)
+        q = cvxopt.matrix(np.hstack((np.ones(m)*-1,np.ones(m)*-2)))
         
-        H = np.multiply(np.dot(np.matrix(Y).T, np.matrix(Y)), K.kernelMat)
-        M_BR = H + np.eye(m) / (self.C * (self.m_value[:,None]))
-        # Concatenate
-        L_L = np.concatenate((np.matrix(0), np.matrix(Y).T), axis=0)
-        L_R = np.concatenate((np.matrix(Y), M_BR), axis=0)
-        L = np.concatenate((L_L, L_R), axis=1)
-        R = np.ones(m + 1)
-        R[0] = 0
-        # solve
-        b_a = LA.solve(L, R)
-        b = b_a[0]
-        alpha = b_a[1:]
+        A = cvxopt.matrix(np.hstack((np.ones(m),np.zeros(m))))
+        A = matrix(A, (1, 2*m), 'd')
+        b = cvxopt.matrix(0.0)
         
+        tmp1 = np.hstack((np.identity(m),np.identity(m)))
+        tmp2 = np.hstack((np.diag(np.ones(m) * -1),np.diag(np.ones(m) * -1)))
+        tmp3 = np.hstack((np.zeros((m,m)),np.identity(m)))
+        tmp4 = np.hstack((np.zeros((m,m)),np.diag(np.ones(m) * -1)))
+        G = cvxopt.matrix(np.vstack((tmp1, tmp2, tmp3, tmp4)))
+        
+        tmp1 = np.zeros(m)
+        tmp2 = np.ones(m) * self.m_value * self.C
+        tmp3 = np.ones(m) * (1-self.m_value) * self.C
+        h = cvxopt.matrix(np.hstack((tmp2, tmp1,tmp3,tmp1)))
+        # solve QP problem
+        solution = cvxopt.solvers.qp(P, q, G, h, A, b)
+
+        sol = np.ravel(solution['x'])
+        gamma = sol[:m]
+        beta = sol[m:]
+        alpha = gamma + beta
+        w_phi = np.multiply(np.sum(K.kernelMat,axis=1),gamma)
+
+        b = 0
+        b = np.sum(Y-w_phi)/len(Y)       
+        print('b',b)
+        self.gamma = gamma
+        self.beta = beta
         self.alpha = alpha
         self.b = b
         self.K = K
@@ -252,13 +250,14 @@ class LSFSVM():
     def predict(self, X):
     
         self.K.expand(X)
-        A = np.multiply(self.alpha, self.Y)
-        y_predict = self.b + np.dot(self.K.testMat, A)
-        self.y_predict = y_predict
+        y_predict = self.b + np.dot(self.K.testMat, self.gamma)
         y_pred = y_predict.copy()
         y_pred[y_pred >= 0] = 1
         y_pred[y_pred < 0] = -1
+        
         self.y_pred = y_pred
+        self.y_predict = y_predict
+        
         return y_pred
     
     def Platt_Probabilistic(self,deci,label,prior1,prior0):
@@ -350,8 +349,7 @@ class LSFSVM():
         return A,B
 
     def predict_prob(self,X):
-        A = np.multiply(self.alpha, self.Y)
-        y_hat = self.b + np.dot(self.kernelMat, A)
+        y_hat = self.b + np.dot(self.kernelMat, self.gamma)
 
         deci = y_hat
         label = self.Y
@@ -359,7 +357,7 @@ class LSFSVM():
         prior0 = len(self.Y[self.Y==-1])
         A,B = self.Platt_Probabilistic(deci,label,prior1,prior0)
         
-        y_prob = 1/(1+np.exp( A*self.y_predict+B)) 
+        y_prob = 1/(1+np.exp( A * self.y_predict+B)) 
         for i in range(len(y_prob)):
             y_prob[i] = round(y_prob[i],3)
             
@@ -383,25 +381,23 @@ if __name__ == '__main__':
     x = data[:,:-1]
     y = data[:,-1]
     
-#    Train_data,test = train_test_split(data, test_size=0.2,random_state = 42)
+    Train_data,test = train_test_split(data, test_size=0.2,random_state = 42)
+   
+    x_test = test[:,:-1]
+    y_test = test[:,-1]
+    x_train = Train_data[:,:-1]
+    y_train = Train_data[:,-1]
     
-#    x_test = test[:,:-1]
-#    y_test = test[:,-1]
-#    x_train = Train_data[:,:-1]
-#    y_train = Train_data[:,-1]
-    
-    ss=StratifiedShuffleSplit(n_splits=3,test_size=0.2,train_size=0.8, random_state=0)#分成5组，测试比例为0.25，训练比例是0.75
-
-    for train_index, test_index in ss.split(x, y):
- #      print("TRAIN:", train_index, "TEST:", test_index)#获得索引值
-       x_train, x_test = x[train_index,:], x[test_index,:]#训练集对应的值
-       y_train, y_test = y[train_index], y[test_index]#类别集对应的值
+#    ss=StratifiedShuffleSplit(n_splits=3,test_size=0.2,train_size=0.8, random_state=0)
+#    for train_index, test_index in ss.split(x, y):
+#       x_train, x_test = x[train_index,:], x[test_index,:]#训练集对应的值
+#       y_train, y_test = y[train_index], y[test_index]#类别集对应的值
 
     
     kernel_dict = {'type': 'RBF','sigma':0.717}
-    fuzzyvalue = {'type':'Cen','function':'Lin'}
+    fuzzyvalue = {'type':'Hyp','function':'Probit'}
     
-    clf = LSFSVM(10,kernel_dict, fuzzyvalue,'o',1)
+    clf = BFSVM(10,kernel_dict, fuzzyvalue,'origine')
     m = clf._mvalue(x_train, y_train)
     clf.fit(x_train, y_train)
     y_pred = clf.predict(x_test)
@@ -411,11 +407,10 @@ if __name__ == '__main__':
 #    print('y_prob',y_prob)   
 #    print(y_pred[y_prob<0.5])
 #    print(y_pred[y_prob>0.5])
-#    print(decision_function)
+    print(decision_function[:10])
     
     print('y_prob',y_prob[:10]) 
     print('y_pred',y_pred[:10]) 
     print('y_test',y_test[:10]) 
+    
     Precision.precision(y_pred,y_test)
-
-
