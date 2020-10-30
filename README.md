@@ -33,3 +33,7 @@ Combine FSVM, LSFSVM with integrated learning. Improve the robustness of the mod
 * Kernel.py : 'rbf','linear','poly' kernel
 * DataDeal.py : Data input and preprocessing
 * Precision.py : calculate recall, precision and accuracy
+
+## Report
+* Implementing Machine Learning Methods in Credit Risk Management.pdf  
+* Soutenance.pdf: PPT
