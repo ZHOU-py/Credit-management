@@ -10,6 +10,7 @@ This projet mainly implements 5 methods based on SVM. Fuzzy SVM, Bilateral Fuzzy
 ## Deployment  
 
 Combine FSVM, LSFSVM with integrated learning. Improve the robustness of the model while maintaining the high accuracy of Fuzzy SVM. And use three encoding methods according to the characteristic of qualitative variables, respectively ordinal encoding, additive encoding, one-hot encoding.  
+
 However, experiments prove that SVM model does not perform well for extremely unbalanced data. The Random forest, Gradient Boost and KNN perform better. Therefore, we also focused on the random forest models. We propose an improved balanced random forest model which greatly imporved the accuracy of the model. 
 
 ## Acknowledge  
